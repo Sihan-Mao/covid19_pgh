@@ -13,6 +13,16 @@
 
 <style>
 	body { margin: 0; padding: 0; }
+  h2 {
+  margin: 10px;
+  font-size: 1.6em;
+  }
+  h3 {
+  margin: 10px;
+  font-size: 1.3em;
+  text-align: center;
+  }
+
 	#map { position: absolute; top: 0; bottom: 0; width: 100%; }
 </style>
 </head>
@@ -20,55 +30,143 @@
 <body>
 <style>
   .mapboxgl-popup {
-max-width: 400px;
-font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
+    max-width: 400px;
+    font: 12px/20px "Helvetica Neue", Arial, Helvetica, sans-serif;
+  }
+  /**
+* Set rules for how the map overlays
+* (information box and legend) will be displayed
+* on the page. */
+  .map-overlay {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    background: rgba(255, 255, 255, 0.8);
+    margin-right: 20px;
+    font-family: Arial, sans-serif;
+    overflow: auto;
+    border-radius: 3px;
+  }
+
+  #features {
+    top: 0;
+    height: 120px;
+    margin-top: 20px;
+    width: 300x;
+  }
+
+  #legend {
+    padding: 18px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    line-height: 18px;
+    height: 150px;
+    margin-bottom: 40px;
+    width: 100px;
+  }
+
+  .legend-key {
+    display: inline-block;
+    border-radius: 40%;
+    width: 20px;
+    height: 20px;
+    margin-right: 5px;
+  }
+
+  p {
+  font-size: 1.3em;
+  margin: 10px;
+  text-align: center;
 }
 
-  .legend {
-background-color: #fff;
-border-radius: 3px;
-bottom: 50px;
-box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-font: 20px/30px 'Helvetica Neue', Arial, Helvetica, sans-serif;
-padding: 20px;
-position: absolute;
-right: 50px;
-z-index: 1;
-}
- 
-.legend h4 {
-margin: 0 0 10px;
-}
- 
-.legend div span {
-border-radius: 50%;
-display: inline-block;
-height: 20px;
-margin-right: 5px;
-width: 20px;
-}
+  
 </style>
 
 <div id="map"></div>
+<div class="map-overlay" id="features"><h2>Allegheny County COVID19 Confirmed Cases</h2><div id="pd"><p>Hover over a municipality to see case number!</p></div></div>
+<div class="map-overlay" id="legend"></div>
 
-<div id="state-legend" class="legend">
-  <h4>Confirmed Cases</h4>
-  <div><span style="background-color: #fc4e2a"></span>240</div>
-  <div><span style="background-color: #fd8d3c"></span>30</div>
-  <div><span style="background-color: #fcaa27"></span>16</div>
-  <div><span style="background-color: #fedc81"></span>7</div>
-  <div><span style="background-color: #fef8dc"></span>2</div>
-  <div><span style="background-color: #f0f0f0"></span>0</div>
-  </div>
 
 <script>
     mapboxgl.accessToken = 'pk.eyJ1Ijoic2loYW4tbWFvIiwiYSI6ImNrM2dlYTAzaDAweDUzY216bm5nNWllam8ifQ.d10BuldnhiAEWQLyIdJYug';
+  
     var map = new mapboxgl.Map({
       container: 'map', // container id
-      style: 'mapbox://styles/sihan-mao/ck8rsxfdu03131intcyos3wsb', //hosted style id
-      center: [-79.9, 40.45], // starting position
+      style: 'mapbox://styles/sihan-mao/ck8ru36x0046s1intgro401xd', //hosted style id
+      center: [-79.75, 40.45], // starting position
       zoom: 9.6 // starting zoom
       });
+  
+    map.on('load', function() {
+          map.getCanvas().style.cursor = 'default';
+      
+          var layers = ['0-2', '3-7', '8-16', '17-30', '31-240', '240+'];
+          var colors = ['#fcfcfc', '#fef8dc', '#fedc81', '#fcaa27', '#fd8d3c', '#fc4e2a'];
+      
+          for (i = 0; i < layers.length; i++) {
+            var layer = layers[i];
+            var color = colors[i];
+            var item = document.createElement('div');
+            var key = document.createElement('span');
+            key.className = 'legend-key';
+            key.style.backgroundColor = color;
+
+            var value = document.createElement('span');
+            value.innerHTML = layer;
+            item.appendChild(key);
+            item.appendChild(value);
+            legend.appendChild(item);
+          }
+          // Add a source for the state polygons.
+          map.addSource('allegheny', {
+            'type': 'geojson',
+            'data':
+              'https://raw.githubusercontent.com/Sihan-Mao/covid19_pgh/master/map/county_covid19.geojson'
+            });
+
+          // Add a layer showing the state polygons.
+          map.addLayer(
+            {
+            'id': 'county-layer',
+            'source': 'allegheny',
+            'type': 'fill',
+            'paint': {
+                'fill-color': [
+                        'step',
+                        ['get', 'Join_Count'],
+                        "#f0f0f0",
+                        0, '#fcfcfc',
+                        2, '#fef8dc',
+                        7, '#fedc81',
+                        16, '#fcaa27',
+                        31, '#fd8d3c',
+                        240, '#fc4e2a'
+                      ],
+              'fill-opacity': 0.7
+                 }
+               }
+             );
+      
+      }); 
+  
+          map.on('mousemove', function(e) {
+            var mun = map.queryRenderedFeatures(e.point, {
+              layers: ['county-layer']
+            });
+
+            if (mun.length > 0) {
+              document.getElementById('pd').innerHTML =
+                '<h3><strong>' +
+                mun[0].properties.NAME +
+                '</strong></h3><p><strong><em>' +
+                mun[0].properties.Join_Count +
+                '</strong> people are infected</em></p>';
+            } else {
+              document.getElementById('pd').innerHTML =
+                '<p>Hover over a municipality to see case number!</p>';
+            }
+          });  
+  
+
 </script>
 
 </body>
